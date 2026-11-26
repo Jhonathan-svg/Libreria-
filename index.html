@@ -122,6 +122,9 @@ body:not(.leyendo) .veil{opacity:1}
 #rain{opacity:0;transition:opacity 1.4s ease}
 body.leyendo #rain{opacity:1}
 body.sala .sky,body.sala .sky2{opacity:0}
+body.novid .vid{opacity:0!important}
+body.novid:not(.sala) #rain{opacity:1}
+body.novid.sala .sky2{opacity:1}
 @media(prefers-reduced-motion:reduce){.vid{display:none}}
 #rain{position:fixed;inset:0;width:100%;height:100%;z-index:-1;pointer-events:none}
 @media(prefers-reduced-motion:reduce){.cloud,.flash,.moon,.sky2::before{animation:none}}
@@ -130,8 +133,8 @@ body.sala .sky,body.sala .sky2{opacity:0}
 <body>
 <div class="sky" aria-hidden="true"><div class="moon"></div><div class="cloud c1"></div><div class="cloud c2"></div><div class="cloud c3"></div><div class="flash"></div></div>
 <div class="sky2" aria-hidden="true"></div>
-<video class="vid" id="vcafe" src="fondo-biblioteca.mp4" autoplay muted loop playsinline preload="auto" aria-hidden="true"></video>
-<video class="vid" id="vcastle" src="fondo-galeria.mp4" autoplay muted loop playsinline preload="metadata" aria-hidden="true"></video>
+<video class="vid" id="vcafe" src="fondo-biblioteca.mp4" autoplay muted loop playsinline preload="auto" aria-hidden="true" onerror="document.body.classList.add('novid')"></video>
+<video class="vid" id="vcastle" src="fondo-galeria.mp4" autoplay muted loop playsinline preload="metadata" aria-hidden="true" onerror="document.body.classList.add('novid')"></video>
 <div class="veil" aria-hidden="true"></div>
 <canvas id="rain" aria-hidden="true"></canvas>
 <header class="top">
@@ -169,7 +172,7 @@ body.sala .sky,body.sala .sky2{opacity:0}
     const target = document.body.classList.contains("leyendo") ? 1 : 0;
     mix = still ? target : mix + (target - mix) * .05;
     if (Math.abs(target - mix) < .003) mix = target;
-    if (!still && target === 0 && mix === 0){ ctx.clearRect(0, 0, w, h); requestAnimationFrame(frame); return; }
+    if (!still && target === 0 && mix === 0 && !document.body.classList.contains("novid")){ ctx.clearRect(0, 0, w, h); requestAnimationFrame(frame); return; }
     ctx.clearRect(0, 0, w, h);
     const night = 1 - mix;
     if (night > 0){
