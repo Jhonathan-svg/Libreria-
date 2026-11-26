@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>El guardián que se ganó mi corazón</title>
+<style>
+:root{--w:300px;--h:calc(var(--w)*1.2941);--gold:#e3b04b;--ink:#10182e;--fg:#e8dcc0;color-scheme:dark;
+ box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+*,*::before,*::after{box-sizing:inherit}
+html,body{height:100%;margin:0}
+body{display:flex;flex-direction:column;overflow:hidden;background:radial-gradient(ellipse at 50% 40%,#0d1630,#04070f);color:var(--fg);font-family:Georgia,"Times New Roman",serif;-webkit-user-select:none;user-select:none}
+header{flex:none;display:flex;flex-direction:column;align-items:center;gap:8px;padding:10px 12px 8px}
+h1{margin:0;font-weight:400;font-size:clamp(.75rem,2.4vw,1rem);letter-spacing:.14em;text-transform:uppercase;text-align:center}
+@media (max-width:700px),(max-height:520px){h1{display:none}}
+.modes{display:flex;gap:8px}
+.volver{color:var(--fg);font-size:.85rem;opacity:.8}
+button{font:inherit;cursor:pointer}
+.modes button{padding:.55rem 1.2rem;border-radius:999px;border:1px solid var(--gold);background:transparent;color:var(--fg);font-size:.95rem}
+body.pdf #bpdf,body.d3 #b3d{background:var(--gold);color:var(--ink)}
+:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
+
+#reader{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:4px 12px 28px;touch-action:pan-y pinch-zoom}
+#reader img{display:block;width:min(100%,860px);aspect-ratio:612/792;height:auto;margin:0 auto 14px;background:#f6f1e6;box-shadow:0 4px 18px rgba(0,0,0,.4)}
+#view{flex:1;min-height:0;flex-direction:column;align-items:center}
+body.pdf #view{display:none}
+body.d3 #reader{display:none}
+body.d3 #view{display:flex}
+
+#stage{flex:1;min-height:0;width:100%;display:flex;align-items:center;justify-content:center;perspective:1700px;touch-action:none;cursor:grab}
+#rot{transform-style:preserve-3d}
+#book{position:relative;width:calc(var(--w)*2);height:var(--h);transform-style:preserve-3d;transition:transform .9s cubic-bezier(.4,.1,.2,1)}
+.leaf{position:absolute;left:50%;top:0;width:var(--w);height:var(--h);transform-origin:left center;transform-style:preserve-3d;transition:transform 1s cubic-bezier(.45,.05,.25,1)}
+.face{position:absolute;inset:0;overflow:hidden;background:#f6f1e6;backface-visibility:hidden;-webkit-backface-visibility:hidden}
+.face img{display:block;width:100%;height:100%;pointer-events:none}
+.face.back{transform:rotateY(180deg)}
+.face.blank{background:#0f1a33}
+.face::after{content:"";position:absolute;inset:0;pointer-events:none}
+.face.front::after{background:linear-gradient(90deg,rgba(0,0,0,.4),transparent 9%)}
+.face.back::after{background:linear-gradient(270deg,rgba(0,0,0,.4),transparent 9%)}
+.ui{flex:none;display:flex;align-items:center;gap:16px;padding:6px 0 12px}
+.ui button{width:46px;height:46px;border-radius:50%;border:0;background:var(--gold);color:var(--ink);font-size:1.6rem;line-height:1;padding:0 0 3px}
+.ui button:disabled{opacity:.35;cursor:default}
+#lbl{min-width:9em;text-align:center}
+</style>
+</head>
+<body class="pdf">
+<header>
+ <a id="volver" class="volver" href="index.html">Volver a la biblioteca</a>
+ <h1 id="titulo"></h1>
+ <div class="modes">
+  <button id="b3d">Ver en 3D</button>
+  <button id="bpdf">Leer como PDF</button>
+ </div>
+</header>
+
+<main id="reader"></main>
+
+<section id="view">
+ <div id="stage"><div id="rot"><div id="book"></div></div></div>
+ <div class="ui">
+  <button id="prev" aria-label="Página anterior">‹</button>
+  <span id="lbl"></span>
+  <button id="next" aria-label="Página siguiente">›</button>
+ </div>
+</section>
+
+<script src="libros.js"></script>
+<script>
+const params=new URLSearchParams(location.search);
+const L=LIBROS.find(x=>x.id===params.get('libro'))||LIBROS[0];
+const P=Array.from({length:L.paginas},(_,i)=>`${L.carpeta}/paginas/${String(i+1).padStart(3,'0')}.jpg`);
+document.title=L.titulo;
+document.getElementById('titulo').textContent=L.titulo;
+document.getElementById('volver').href='index.html#'+L.id;
+const N=Math.ceil(P.length/2);
+const $=id=>document.getElementById(id);
+const reader=$('reader'),book=$('book'),rot=$('rot'),stage=$('stage'),lbl=$('lbl'),prev=$('prev'),next=$('next');
+let mode='pdf',cur=0,side='r',tilt={x:8,y:-18},wasSingle=null;
+const isSingle=()=>innerWidth<=900||innerHeight<=520||innerHeight>innerWidth;
+
+/* modo PDF: las páginas una debajo de otra */
+P.forEach((s,i)=>{const im=new Image();im.loading='lazy';im.decoding='async';im.alt='Página '+(i+1);im.src=s;reader.appendChild(im);});
+
+/* modo 3D: hojas con dos caras */
+const face=(c,s)=>s?`<div class="face ${c}"><img src="${s}" alt="" draggable="false"></div>`:`<div class="face ${c} blank"></div>`;
+const leaves=[];
+for(let i=0;i<N;i++){
+ const l=document.createElement('div');l.className='leaf';
+ l.innerHTML=face('front',P[2*i])+face('back',P[2*i+1]);
+ book.appendChild(l);leaves.push(l);
+}
+const setTilt=()=>{rot.style.transform=`rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`;};
+
+function render(){
+ const single=isSingle();
+ if(single!==wasSingle){wasSingle=single;tilt.y=single?-8:-18;if(single)side=cur===N?'l':'r';setTilt();}
+ if(single){if(cur===0)side='r';if(cur===N)side='l';}
+ leaves.forEach((l,i)=>{const f=i<cur;l.style.transform=`translateZ(${f?i:N-i}px) rotateY(${f?-180:0}deg)`;});
+ const shift=single?(side==='r'?-25:25):(cur===0?-25:cur===N?25:0);
+ book.style.transform=`translateX(${shift}%)`;
+ const atCover=cur===0&&(!single||side==='r');
+ lbl.textContent=atCover?'Portada':cur===N?'Contraportada':single?`Pág. ${side==='r'?2*cur+1:2*cur} de ${P.length}`:`Págs. ${2*cur}–${2*cur+1} de ${P.length}`;
+ prev.disabled=atCover;next.disabled=cur===N;
+ const W=stage.clientWidth,H=stage.clientHeight;
+ if(W&&H){const w=single?Math.min(W*.9,H*.9/1.2941):Math.min(W*.42,H*.88/1.2941,460);
+  document.documentElement.style.setProperty('--w',Math.max(120,w)+'px');}
+}
+
+function go(d){
+ if(!isSingle()){cur=Math.max(0,Math.min(N,cur+d));}
+ else if(d>0){if(side==='l'&&cur<N)side='r';else if(cur<N){cur++;side='l';}}
+ else{if(side==='r'&&cur>0)side='l';else if(side==='l'&&cur>0){cur--;side='r';}}
+ render();
+}
+prev.onclick=()=>go(-1);next.onclick=()=>go(1);
+addEventListener('keydown',e=>{if(mode==='d3'){if(e.key==='ArrowRight')go(1);if(e.key==='ArrowLeft')go(-1);}});
+
+/* arrastrar para girar, tocar para pasar la página */
+let down=false,drag=false,sx=0,sy=0,t0=null;
+stage.addEventListener('pointerdown',e=>{down=true;drag=false;sx=e.clientX;sy=e.clientY;t0={...tilt};});
+addEventListener('pointermove',e=>{
+ if(!down)return;
+ const dx=e.clientX-sx,dy=e.clientY-sy;
+ if(!drag&&Math.hypot(dx,dy)>6)drag=true;
+ if(drag){tilt.y=Math.max(-70,Math.min(70,t0.y+dx*.4));tilt.x=Math.max(-30,Math.min(30,t0.x-dy*.3));setTilt();}
+});
+addEventListener('pointerup',e=>{
+ if(!down)return;down=false;
+ if(drag)return;
+ const r=stage.getBoundingClientRect();
+ if(cur===0)go(1);else if(cur===N)go(-1);else go(e.clientX>r.left+r.width/2?1:-1);
+});
+
+/* cambiar de modo */
+function setMode(m){
+ mode=m;document.body.className=m;
+ try{history.replaceState(null,'','#'+(m==='pdf'?'pdf':'3d'));}catch(e){}
+ if(m==='d3')render();
+}
+$('b3d').onclick=()=>setMode('d3');
+$('bpdf').onclick=()=>setMode('pdf');
+addEventListener('hashchange',()=>{if(location.hash==='#3d')setMode('d3');if(location.hash==='#pdf')setMode('pdf');});
+addEventListener('resize',()=>{if(mode==='d3')render();});
+
+setTilt();
+setMode(location.hash==='#3d'?'d3':location.hash==='#pdf'?'pdf':(isSingle()?'pdf':'d3'));
+</script>
+</body>
+</html>
