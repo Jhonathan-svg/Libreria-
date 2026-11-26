@@ -47,6 +47,20 @@ main{padding:0 5vw 60px}
 .pick button.on{color:var(--lamp)}
 .pick button:hover{transform:scale(1.18)}
 .rate .hint{margin:2px 0 0}
+.top .btn{white-space:nowrap}
+.sala-t{font-size:clamp(1.8rem,4vw,2.8rem);line-height:1.1}
+.galeria{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:40px 28px;padding:18px 0 40px}
+.frame{background:none;border:0;padding:0;text-align:center;display:block}
+.frame .mk{display:block;padding:12px;background:linear-gradient(135deg,#7a4e28,#3d2412);border-radius:3px;box-shadow:0 14px 28px rgba(0,0,0,.55),inset 0 0 0 2px rgba(255,214,150,.2);transition:transform .25s}
+.frame .lienzo{display:block;aspect-ratio:1;padding:10px;background:var(--paper);box-shadow:inset 0 0 14px rgba(0,0,0,.35)}
+.frame img{width:100%;height:100%;object-fit:contain;display:block}
+.frame:hover .mk,.frame:focus-visible .mk{transform:translateY(-5px) rotate(-.8deg)}
+.frame b{display:block;margin-top:14px;font-family:Fraunces,Georgia,serif}
+.frame small{color:var(--mut)}
+.lb{position:fixed;inset:0;z-index:50;display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:5vw;background:rgba(6,4,3,.9);cursor:zoom-out}
+.lb.on{display:flex}
+.lb img{max-width:92vw;max-height:76vh;background:var(--paper);padding:12px;border-radius:4px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.lb p{margin:0;font-family:Fraunces,Georgia,serif;font-size:1.2rem}
 /* página del libro */
 .back{background:none;border:1px solid var(--line);border-radius:999px;padding:8px 16px;margin:6px 0 24px}
 .back:hover{border-color:var(--lamp)}
@@ -100,6 +114,15 @@ background:radial-gradient(ellipse at 15% 5%,rgba(242,184,75,.30),transparent 45
 @keyframes sway{from{transform:rotate(-4deg)}to{transform:rotate(5deg)}}
 body.leyendo .sky{opacity:0}
 body.leyendo .sky2{opacity:1}
+.vid{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:-2;opacity:0;pointer-events:none;transition:opacity 1.4s ease}
+body:not(.leyendo):not(.sala) #vcafe{opacity:1}
+body.sala #vcastle{opacity:1}
+.veil{position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:0;transition:opacity 1.4s ease;background:linear-gradient(180deg,rgba(6,12,22,.50),rgba(6,12,22,.72))}
+body:not(.leyendo) .veil{opacity:1}
+#rain{opacity:0;transition:opacity 1.4s ease}
+body.leyendo #rain{opacity:1}
+body.sala .sky,body.sala .sky2{opacity:0}
+@media(prefers-reduced-motion:reduce){.vid{display:none}}
 #rain{position:fixed;inset:0;width:100%;height:100%;z-index:-1;pointer-events:none}
 @media(prefers-reduced-motion:reduce){.cloud,.flash,.moon,.sky2::before{animation:none}}
 </style>
@@ -107,9 +130,13 @@ body.leyendo .sky2{opacity:1}
 <body>
 <div class="sky" aria-hidden="true"><div class="moon"></div><div class="cloud c1"></div><div class="cloud c2"></div><div class="cloud c3"></div><div class="flash"></div></div>
 <div class="sky2" aria-hidden="true"></div>
+<video class="vid" id="vcafe" src="fondo-biblioteca.mp4" autoplay muted loop playsinline preload="auto" aria-hidden="true"></video>
+<video class="vid" id="vcastle" src="fondo-galeria.mp4" autoplay muted loop playsinline preload="metadata" aria-hidden="true"></video>
+<div class="veil" aria-hidden="true"></div>
 <canvas id="rain" aria-hidden="true"></canvas>
 <header class="top">
   <a class="logo serif" href="#" id="home-link">Mi biblioteca</a>
+  <a class="btn" href="#sala" id="sala-link">Sala de dibujos</a>
   <input class="search" id="q" type="search" placeholder="Buscar por título o autor" aria-label="Buscar por título o autor">
 </header>
 <main id="app"></main>
@@ -142,6 +169,7 @@ body.leyendo .sky2{opacity:1}
     const target = document.body.classList.contains("leyendo") ? 1 : 0;
     mix = still ? target : mix + (target - mix) * .05;
     if (Math.abs(target - mix) < .003) mix = target;
+    if (!still && target === 0 && mix === 0){ ctx.clearRect(0, 0, w, h); requestAnimationFrame(frame); return; }
     ctx.clearRect(0, 0, w, h);
     const night = 1 - mix;
     if (night > 0){
@@ -195,6 +223,7 @@ body.leyendo .sky2{opacity:1}
 })();
 </script>
 <script src="libros.js"></script>
+<script src="dibujos.js"></script>
 <script>
 const app = document.getElementById("app");
 const q = document.getElementById("q");
@@ -205,7 +234,7 @@ let raf = 0;
    Para que los votos se compartan entre todos los visitantes, pega aquí la URL de tu
    Firebase Realtime Database (ejemplo: "https://mi-biblioteca-default-rtdb.firebaseio.com").
    Si la dejas vacía, cada persona solo ve su propia calificación en su navegador. */
-const VOTOS_URL = "https://libreria-b3975-default-rtdb.firebaseio.com/";
+const VOTOS_URL = "https://libreria-b3975-default-rtdb.firebaseio.com";
 const ls = { get(k, d){ try{ return JSON.parse(localStorage.getItem(k)) ?? d; }catch(e){ return d; } },
              set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} } };
 const vid = ls.get("visitante", null) || (() => { const v = Math.random().toString(36).slice(2, 12); ls.set("visitante", v); return v; })();
@@ -297,11 +326,43 @@ function detalle(l){
   document.getElementById("back").onclick = () => { location.hash = ""; };
 }
 
+function sala(){
+  cancelAnimationFrame(raf);
+  const D = typeof DIBUJOS !== "undefined" ? DIBUJOS : [];
+  app.innerHTML = `
+    <button class="back" id="back">Volver a la biblioteca</button>
+    <h1 class="sala-t">Sala de dibujos</h1>
+    <p class="meta">Toca un dibujo para verlo en grande.</p>
+    ${D.length ? `<div class="galeria">${D.map((d, i) => `
+      <button type="button" class="frame" data-i="${i}" aria-label="Ver ${esc(d.titulo)}">
+        <span class="mk"><span class="lienzo"><img src="${esc(d.imagen)}" alt="${esc(d.titulo)}" loading="lazy"></span></span>
+        <b>${esc(d.titulo)}</b>${d.autor ? `<small>${esc(d.autor)}</small>` : ""}
+      </button>`).join("")}</div>` : '<p class="empty">Aún no hay dibujos en la sala.</p>'}`;
+  document.getElementById("back").onclick = () => { location.hash = ""; };
+}
+const lb = document.createElement("div");
+lb.className = "lb"; lb.setAttribute("role", "dialog"); lb.setAttribute("aria-modal", "true");
+document.body.appendChild(lb);
+const cerrarLb = () => lb.classList.remove("on");
+lb.addEventListener("click", cerrarLb);
+addEventListener("keydown", e => { if(e.key === "Escape") cerrarLb(); });
+app.addEventListener("click", e => {
+  const f = e.target.closest(".frame"); if(!f) return;
+  const d = DIBUJOS[+f.dataset.i];
+  lb.innerHTML = `<img src="${esc(d.imagen)}" alt="${esc(d.titulo)}"><p>${esc(d.titulo)}</p>`;
+  lb.classList.add("on");
+});
+
 function ruta(){
+  const enSala = location.hash === "#sala";
   const l = LIBROS.find(x => x.id === location.hash.slice(1));
   window.scrollTo(0, 0);
   document.body.classList.toggle("leyendo", !!l);
-  l ? detalle(l) : home();
+  document.body.classList.toggle("sala", enSala);
+  enSala ? sala() : l ? detalle(l) : home();
+  const vc = document.getElementById("vcastle"), vf = document.getElementById("vcafe");
+  if(enSala){ vc.play().catch(()=>{}); } else { setTimeout(() => { if(location.hash !== "#sala") vc.pause(); }, 1500); }
+  if(!l){ vf.play().catch(()=>{}); } else { setTimeout(() => { if(LIBROS.some(x => x.id === location.hash.slice(1))) vf.pause(); }, 1500); }
 }
 
 app.addEventListener("click", e => {
@@ -315,7 +376,7 @@ window.addEventListener("hashchange", ruta);
 ruta();
 cargarVotos().then(() => {
   const l = LIBROS.find(x => x.id === location.hash.slice(1));
-  if(l) pintarRate(l); else if(!q.value) home();
+  if(l) pintarRate(l); else if(!q.value && location.hash !== "#sala") home();
 });
 </script>
 </body>
