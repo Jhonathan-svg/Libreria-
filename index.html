@@ -37,6 +37,16 @@ main{padding:0 5vw 60px}
 .card b{display:block;margin-top:12px;font-weight:600;line-height:1.3}
 .card small{color:var(--mut)}
 .empty{color:var(--mut);padding:40px 0}
+.st{display:inline-block;letter-spacing:2px;background:linear-gradient(90deg,var(--lamp) var(--p,0%),#3a4f6b var(--p,0%));-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent}
+.rt{display:block;font-size:.85rem;color:var(--mut);margin-top:3px}
+.rate{margin:0 0 20px;display:flex;flex-wrap:wrap;align-items:center;gap:12px 28px}
+.rate .big{font-size:1.1rem}
+.rate .big .st{font-size:1.5rem;vertical-align:middle}
+.pick{display:flex;gap:2px;margin-left:-4px}
+.pick button{background:none;border:0;padding:2px 3px;font-size:2rem;line-height:1;color:#3a4f6b;transition:transform .12s,color .12s}
+.pick button.on{color:var(--lamp)}
+.pick button:hover{transform:scale(1.18)}
+.rate .hint{margin:2px 0 0}
 /* página del libro */
 .back{background:none;border:1px solid var(--line);border-radius:999px;padding:8px 16px;margin:6px 0 24px}
 .back:hover{border-color:var(--lamp)}
@@ -83,12 +93,20 @@ background:radial-gradient(circle at 30% 40%,#bdb597 0 9%,transparent 10%),radia
 @keyframes drift{to{transform:translateX(170vw)}}
 .flash{position:absolute;inset:0;background:#cfe0ff;opacity:0;animation:flash 17s infinite}
 @keyframes flash{0%,90%,100%{opacity:0}91%{opacity:.10}92%{opacity:0}93.5%{opacity:.18}95%{opacity:0}}
+.sky{transition:opacity 1.4s ease}
+.sky2{position:fixed;inset:0;z-index:-2;opacity:0;pointer-events:none;overflow:hidden;transition:opacity 1.4s ease;
+background:radial-gradient(ellipse at 15% 5%,rgba(242,184,75,.30),transparent 45%),radial-gradient(ellipse at 90% 100%,rgba(130,65,20,.35),transparent 55%),linear-gradient(180deg,#120b07,#21140b 60%,#2e1c0f)}
+.sky2::before{content:"";position:absolute;top:-25%;left:-10%;width:65%;height:150%;background:linear-gradient(100deg,transparent 30%,rgba(242,184,75,.08) 46%,transparent 62%);transform-origin:top left;animation:sway 12s ease-in-out infinite alternate}
+@keyframes sway{from{transform:rotate(-4deg)}to{transform:rotate(5deg)}}
+body.leyendo .sky{opacity:0}
+body.leyendo .sky2{opacity:1}
 #rain{position:fixed;inset:0;width:100%;height:100%;z-index:-1;pointer-events:none}
-@media(prefers-reduced-motion:reduce){.cloud,.flash,.moon{animation:none}}
+@media(prefers-reduced-motion:reduce){.cloud,.flash,.moon,.sky2::before{animation:none}}
 </style>
 </head>
 <body>
 <div class="sky" aria-hidden="true"><div class="moon"></div><div class="cloud c1"></div><div class="cloud c2"></div><div class="cloud c3"></div><div class="flash"></div></div>
+<div class="sky2" aria-hidden="true"></div>
 <canvas id="rain" aria-hidden="true"></canvas>
 <header class="top">
   <a class="logo serif" href="#" id="home-link">Mi biblioteca</a>
@@ -113,33 +131,67 @@ background:radial-gradient(circle at 30% 40%,#bdb597 0 9%,transparent 10%),radia
     stars = Array.from({ length: 70 }, () => ({ x: Math.random() * w, y: Math.random() * h * .55,
       r: Math.random() * 1.2 + .3, p: Math.random() * 6.28, s: .01 + Math.random() * .02 }));
   }
+  let mix = 0, fly = [], dust = [];
+  function resizeExtra(){
+    fly = Array.from({ length: Math.min(45, Math.floor(w / 28)) }, () => ({ x: Math.random() * w, y: Math.random() * h,
+      r: 1.3 + Math.random() * 1.8, p: Math.random() * 6.28, s: .02 + Math.random() * .03, vx: (Math.random() - .5) * .3 }));
+    dust = Array.from({ length: 60 }, () => ({ x: Math.random() * w, y: Math.random() * h,
+      r: .5 + Math.random() * 1.2, v: .1 + Math.random() * .25, p: Math.random() * 6.28, a: .12 + Math.random() * .25 }));
+  }
   function frame(){
+    const target = document.body.classList.contains("leyendo") ? 1 : 0;
+    mix = still ? target : mix + (target - mix) * .05;
+    if (Math.abs(target - mix) < .003) mix = target;
     ctx.clearRect(0, 0, w, h);
-    for (const t of stars){
-      t.p += t.s;
-      ctx.fillStyle = `rgba(255,250,235,${.25 + .35 * Math.abs(Math.sin(t.p))})`;
-      ctx.beginPath(); ctx.arc(t.x, t.y, t.r, 0, 6.28); ctx.fill();
-    }
-    ctx.lineWidth = 1.1; ctx.lineCap = "round";
-    for (const d of drops){
-      ctx.strokeStyle = `rgba(185,205,235,${d.a})`;
-      ctx.beginPath(); ctx.moveTo(d.x, d.y); ctx.lineTo(d.x - d.len * .18, d.y + d.len); ctx.stroke();
-      d.y += d.v; d.x -= d.v * .18;
-      if (d.y > h){
-        if (Math.random() < .35) splashes.push({ x: d.x, y: h - 2, r: 1, a: .35 });
-        Object.assign(d, mk(false));
+    const night = 1 - mix;
+    if (night > 0){
+      ctx.globalAlpha = night;
+      for (const t of stars){
+        t.p += t.s;
+        ctx.fillStyle = `rgba(255,250,235,${.25 + .35 * Math.abs(Math.sin(t.p))})`;
+        ctx.beginPath(); ctx.arc(t.x, t.y, t.r, 0, 6.28); ctx.fill();
       }
-      if (d.x < -20) d.x = w + 20;
+      ctx.lineWidth = 1.1; ctx.lineCap = "round";
+      for (const d of drops){
+        ctx.strokeStyle = `rgba(185,205,235,${d.a})`;
+        ctx.beginPath(); ctx.moveTo(d.x, d.y); ctx.lineTo(d.x - d.len * .18, d.y + d.len); ctx.stroke();
+        d.y += d.v; d.x -= d.v * .18;
+        if (d.y > h){
+          if (Math.random() < .35) splashes.push({ x: d.x, y: h - 2, r: 1, a: .35 });
+          Object.assign(d, mk(false));
+        }
+        if (d.x < -20) d.x = w + 20;
+      }
+      splashes = splashes.filter(s => (s.r += .5) < 9);
+      for (const s of splashes){
+        ctx.strokeStyle = `rgba(185,205,235,${.3 * (1 - s.r / 9)})`;
+        ctx.beginPath(); ctx.ellipse(s.x, s.y, s.r, s.r * .35, 0, 0, 6.28); ctx.stroke();
+      }
     }
-    splashes = splashes.filter(s => (s.r += .5) < 9);
-    for (const s of splashes){
-      ctx.strokeStyle = `rgba(185,205,235,${.3 * (1 - s.r / 9)})`;
-      ctx.beginPath(); ctx.ellipse(s.x, s.y, s.r, s.r * .35, 0, 0, 6.28); ctx.stroke();
+    if (mix > 0){
+      ctx.globalAlpha = mix;
+      for (const m of dust){
+        m.p += .01; m.y -= m.v; m.x += Math.sin(m.p) * .2;
+        if (m.y < -5){ m.y = h + 5; m.x = Math.random() * w; }
+        ctx.fillStyle = `rgba(255,226,160,${m.a})`;
+        ctx.beginPath(); ctx.arc(m.x, m.y, m.r, 0, 6.28); ctx.fill();
+      }
+      for (const f of fly){
+        f.p += f.s;
+        f.x += Math.sin(f.p * .7) * .35 + f.vx; f.y += Math.cos(f.p * .5) * .3 - .08;
+        if (f.y < -10) f.y = h + 10; if (f.x < -10) f.x = w + 10; if (f.x > w + 10) f.x = -10;
+        const al = .35 + .65 * Math.max(0, Math.sin(f.p));
+        const g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, f.r * 7);
+        g.addColorStop(0, `rgba(255,214,120,${al})`); g.addColorStop(.25, `rgba(242,184,75,${al * .45})`); g.addColorStop(1, "rgba(242,184,75,0)");
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(f.x, f.y, f.r * 7, 0, 6.28); ctx.fill();
+      }
     }
+    ctx.globalAlpha = 1;
     if (!still) requestAnimationFrame(frame);
   }
-  addEventListener("resize", () => { resize(); if (still) frame(); });
-  resize(); frame();
+  addEventListener("resize", () => { resize(); resizeExtra(); if (still) frame(); });
+  addEventListener("hashchange", () => { if (still) frame(); });
+  resize(); resizeExtra(); frame();
 })();
 </script>
 <script src="libros.js"></script>
@@ -148,6 +200,57 @@ const app = document.getElementById("app");
 const q = document.getElementById("q");
 const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 let raf = 0;
+
+/* ===== Calificaciones =====
+   Para que los votos se compartan entre todos los visitantes, pega aquí la URL de tu
+   Firebase Realtime Database (ejemplo: "https://mi-biblioteca-default-rtdb.firebaseio.com").
+   Si la dejas vacía, cada persona solo ve su propia calificación en su navegador. */
+const VOTOS_URL = "";
+const ls = { get(k, d){ try{ return JSON.parse(localStorage.getItem(k)) ?? d; }catch(e){ return d; } },
+             set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} } };
+const vid = ls.get("visitante", null) || (() => { const v = Math.random().toString(36).slice(2, 12); ls.set("visitante", v); return v; })();
+const mios = ls.get("misVotos", {});
+let votos = {};
+const kid = id => String(id).replace(/[.#$\[\]\/]/g, "_");
+
+async function cargarVotos(){
+  if(!VOTOS_URL) return;
+  try{
+    const r = await fetch(VOTOS_URL.replace(/\/$/, "") + "/votos.json");
+    if(r.ok) votos = (await r.json()) || {};
+  }catch(e){}
+}
+function resumen(id){
+  const v = { ...(votos[kid(id)] || {}) };
+  if(mios[id]) v[vid] = mios[id];
+  const n = Object.values(v).filter(x => x >= 1 && x <= 5);
+  return { n: n.length, avg: n.length ? n.reduce((a, b) => a + b, 0) / n.length : 0 };
+}
+function votar(id, n){
+  mios[id] = n; ls.set("misVotos", mios);
+  (votos[kid(id)] ||= {})[vid] = n;
+  if(VOTOS_URL) fetch(VOTOS_URL.replace(/\/$/, "") + "/votos/" + kid(id) + "/" + vid + ".json",
+    { method: "PUT", body: JSON.stringify(n) }).catch(() => {});
+}
+const stars = avg => `<span class="st" style="--p:${(avg / 5 * 100).toFixed(0)}%" aria-hidden="true">★★★★★</span>`;
+function rt(l){
+  const r = resumen(l.id);
+  return `<span class="rt" aria-label="${r.n ? "Calificación " + r.avg.toFixed(1) + " de 5" : "Sin calificaciones"}">${stars(r.avg)}${r.n ? " " + r.avg.toFixed(1) + " (" + r.n + ")" : ""}</span>`;
+}
+function pintarRate(l){
+  const el = document.getElementById("rate"); if(!el) return;
+  const r = resumen(l.id), mi = mios[l.id] || 0;
+  el.innerHTML = `
+    <div class="big">${stars(r.avg)} <b>${r.n ? r.avg.toFixed(1) : "Sin calificaciones"}</b>${r.n ? ` <span class="meta">(${r.n} ${r.n == 1 ? "voto" : "votos"})</span>` : ""}</div>
+    <div><div class="pick" role="group" aria-label="Tu calificación">${[1,2,3,4,5].map(n =>
+      `<button type="button" data-n="${n}" class="${n <= mi ? "on" : ""}" aria-label="${n} ${n > 1 ? "estrellas" : "estrella"}" aria-pressed="${n == mi}">★</button>`).join("")}</div>
+      <p class="hint">${mi ? "Tu calificación: " + mi + " de 5. Toca otra estrella para cambiarla." : "¿Qué te pareció? Toca las estrellas para calificar."}</p></div>`;
+  const pick = el.querySelector(".pick"), bs = [...pick.children];
+  const pon = n => bs.forEach(b => b.classList.toggle("on", +b.dataset.n <= n));
+  pick.addEventListener("mouseover", e => { const b = e.target.closest("button"); if(b) pon(+b.dataset.n); });
+  pick.addEventListener("mouseleave", () => pon(mi));
+  pick.addEventListener("click", e => { const b = e.target.closest("button"); if(!b) return; votar(l.id, +b.dataset.n); pintarRate(l); });
+}
 
 function cover(l){
   const fb = `<div class="fb">${esc(l.titulo)}</div>`;
@@ -168,7 +271,7 @@ function home(){
       <div class="sec-h"><h2>${esc(nombre)}</h2>
         <div class="arrows"><button data-s="${i}" data-d="-1" aria-label="Anterior">‹</button><button data-s="${i}" data-d="1" aria-label="Siguiente">›</button></div></div>
       <div class="row" id="row${i}">${libros.map(l => `
-        <a class="card" href="#${esc(l.id)}">${cover(l)}<b>${esc(l.titulo)}</b><small>${esc(l.autor)}, ${l.anio}</small></a>`).join("")}</div>
+        <a class="card" href="#${esc(l.id)}">${cover(l)}<b>${esc(l.titulo)}</b><small>${esc(l.autor)}, ${l.anio}</small>${rt(l)}</a>`).join("")}</div>
     </section>`).join("");
 }
 
@@ -182,6 +285,7 @@ function detalle(l){
       <div class="info">
         <h1>${esc(l.titulo)}</h1>
         <p class="meta">${esc(l.autor)}, ${esc(l.genero)}, ${l.anio}</p>
+        <div class="rate" id="rate"></div>
         <p class="syn">${esc(l.sinopsis)}</p>
         <div class="tabs">
           <a class="btn go" href="${u}#3d">Ver en 3D</a>
@@ -189,12 +293,14 @@ function detalle(l){
         </div>
       </div>
     </div>`;
+  pintarRate(l);
   document.getElementById("back").onclick = () => { location.hash = ""; };
 }
 
 function ruta(){
   const l = LIBROS.find(x => x.id === location.hash.slice(1));
   window.scrollTo(0, 0);
+  document.body.classList.toggle("leyendo", !!l);
   l ? detalle(l) : home();
 }
 
@@ -207,6 +313,10 @@ app.addEventListener("click", e => {
 q.addEventListener("input", () => { if(location.hash) location.hash = ""; else home(); });
 window.addEventListener("hashchange", ruta);
 ruta();
+cargarVotos().then(() => {
+  const l = LIBROS.find(x => x.id === location.hash.slice(1));
+  if(l) pintarRate(l); else if(!q.value) home();
+});
 </script>
 </body>
 </html>
